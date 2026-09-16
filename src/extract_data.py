@@ -2,19 +2,20 @@ import os
 import json 
 from datetime import datetime
 import time
-from requests.exceptions import RequestException 
 
+
+from requests.exceptions import RequestException
+import boto3
+from botocore.exceptions import NoCredentialsError, ClientError
 import requests 
 from dotenv import load_dotenv
-
-
-
-os.makedirs("data/bronze", exist_ok=True)
 
 # Loading environment variables from the .env file
 load_dotenv()
 
 api_key = os.getenv("COINGECKO_API_KEY")
+bucket_name = os.getenv("AWS_BUCKET_NAME")
+S3_PREFIX =  "bronze"
 
 url = "https://api.coingecko.com/api/v3/simple/price"
 
@@ -59,15 +60,33 @@ for attempt in range(3):
         print("Falha de rede. Tentando novamente em 5 segundos...")
         time.sleep(5)
 
-# In this block, we extract the data containing the date and save it to a JSON file.
+# In this block, we extract the data containing the date and upload it to s3.
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 filename = f"crypto_prices_{timestamp}.json"
 
-caminho_completo = os.path.join("data/bronze", filename)
 
-with open(caminho_completo, 'w') as crypto_file:
-    json.dump(data, crypto_file)
+def upload_to_s3(data, filename):
+    
+    s3 = boto3.client('s3')
+    s3_key = f"{S3_PREFIX}/{filename}"
+
+    print(f"Starting upload  files to S3 (bucket: {bucket_name}).....")
+
+    try:
+        s3.put_object(
+            Bucket=bucket_name,
+            Key=s3_key,
+            Body=json.dumps(data)
+             )
+    except NoCredentialsError:
+        print("Error: AWS credentials not found. Verifique se a IAM Role está anexada à instância.")
+        return
+    except ClientError as e:
+        print(f"AWS error on file {filename}: {e})")
+        return
+        
+    print("Upload concluído: s3://{bucket_name}/{s3_key}")
 
 
-
+upload_to_s3(data, filename)
