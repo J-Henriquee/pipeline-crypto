@@ -6,28 +6,7 @@ Projeto de estudo — o objetivo é praticar o pipeline de ponta a ponta (contai
 
 ## Arquitetura
 
-```mermaid
-flowchart LR
-    API[API CoinGecko]
-
-    subgraph EC2["Instância EC2 (efêmera — liga, roda, desliga)"]
-        Container["Container Docker<br/>extract_data.py"]
-    end
-
-    S3B[("S3 — bronze/<br/>JSON bruto, timestampado")]
-    Glue["AWS Glue<br/>Python Shell<br/>(limpeza + normalização)"]
-    S3S[("S3 — silver/<br/>Parquet particionado por data")]
-    Redshift[("Redshift Serverless<br/>star schema (gold)")]
-    Queries["Queries analíticas"]
-
-    API -->|requests + retry/backoff| Container
-    Container -->|boto3 put_object<br/>direto da memória| S3B
-    S3B --> Glue
-    Glue -->|awswrangler to_parquet| S3S
-    S3S -->|COPY| Staging["stg_precos"]
-    Staging -->|INSERT SELECT| Redshift
-    Redshift --> Queries
-```
+![Diagrama da Arquitetura Medalhão AWS](assets/arquitetura_aws.jpg)
 
 **Orquestração (Airflow):** planejada, mas adiada. Subir o stack completo (webserver + scheduler + Postgres + Redis) via Docker Compose se mostrou pesado demais para o hardware disponível localmente e chegou a travar a máquina duas vezes. A decisão foi não insistir num ambiente que não aguenta a carga — o próximo passo, se retomado, é rodar o Airflow numa instância com mais recursos (EC2 dedicada) em vez de localmente.
 
